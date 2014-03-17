@@ -27,10 +27,10 @@ class ApiInfo(ApiBase):
     path = 'query.cgi'
     namespace = 'SYNO.API.Info'
 
-    def query(self, *args):
+    def query(self, **kwargs):
         params = self.base_params
         params['method'] = 'query'
-        params['query'] = u','.join(args)
+        params.update(kwargs)
         return self.request_manager.run(self.path, 'get', self.namespace, params)
 
 
@@ -73,6 +73,52 @@ class ApiDownloadStationInfo(ApiBase):
                                         params, use_auth=True)
 
 
+class ApiDownloadStationSchedule(ApiBase):
+    path = 'DownloadStation/schedule.cgi'
+    namespace = 'SYNO.DownloadStation.Schedule'
+
+    def get_config(self):
+        params = self.base_params
+        params['method'] = 'getconfig'
+        return self.request_manager.run(self.path, 'get', self.namespace,
+                                        params, use_auth=True)
+
+    def set_config(self, **kwargs):
+        params = self.base_params
+        params['method'] = 'setconfig'
+        params.update(kwargs)
+        return self.request_manager.run(self.path, 'get', self.namespace,
+                                        params, use_auth=True)
+
+
 class ApiDownloadStationTask(ApiBase):
     path = 'DownloadStation/task.cgi'
     namespace = 'SYNO.DownloadStation.Task'
+
+    def list(self, **kwargs):
+        params = self.base_params
+        params['method'] = 'list'
+        params.update(kwargs)
+        return self.request_manager.run(self.path, 'get', self.namespace,
+                                        params, use_auth=True)
+
+    def get_info(self, **kwargs):
+        params = self.base_params
+        params['method'] = 'getinfo'
+        params.update(kwargs)
+        return self.request_manager.run(self.path, 'get', self.namespace,
+                                        params, use_auth=True)
+
+    def create(self, **kwargs):
+        params = self.base_params
+        params['method'] = 'create'
+        params.update(kwargs)
+        return self.request_manager.run(self.path, 'post', self.namespace,
+                                        params, use_auth=True)
+
+    def pause(self, **kwargs):
+        params = self.base_params
+        params['method'] = 'pause'
+        params.update(kwargs)
+        return self.request_manager.run(self.path, 'get', self.namespace,
+                                        params, use_auth=True)
