@@ -53,7 +53,8 @@ class Connection(object):
                 opts['cookies'] = auth_params
         return opts
 
-    def send(self, path, http_method, namespace, params):
+    def send(self, path, http_method, namespace, params, caller=None):
+        api_method = params['method']
         http_method = http_method.lower()
         assert http_method in ('get', 'post'), "invalid http method"
 
@@ -63,6 +64,9 @@ class Connection(object):
             resp = requests.get(url, **opts)
         else:
             resp = requests.post(url, **opts)
+
+        if caller and caller.has_handler(api_method):
+            return caller.get_handler(api_method)(resp)
         return self.handle_response(resp, namespace)
 
     def handle_response(self, resp, namespace):
@@ -112,7 +116,13 @@ def _send_command(self, api_method, http_method, params):
     all_params = self.base_params
     all_params['method'] = api_method
     all_params.update(params)
-    return self.conn.send(self.path, http_method, self.namespace, all_params)
+    return self.conn.send(
+        self.path,
+        http_method,
+        self.namespace,
+        all_params,
+        caller=self
+    )
 
 
 class ApiBaseMeta(type):
@@ -124,7 +134,7 @@ class ApiBaseMeta(type):
         api_methods = attrs.pop('methods')
         if isinstance(api_methods, basestring):
             api_methods = [api_methods]
-            
+
         for api_method in api_methods:
             cls.add_api_method(api_method)
 
@@ -181,6 +191,7 @@ class ApiBase(object):
         self.version = str(version)
         self.prefix = namespace_prefix or u''
         self.path = u'/'.join([self.prefix, self.path])
+        self._handlers = {}
 
     @property
     def base_params(self):
@@ -188,3 +199,12 @@ class ApiBase(object):
             'api': self.namespace,
             'version': self.version
         }
+
+    def add_handler(self, api_method, handler):
+        self._handlers[api_method] = handler
+
+    def has_handler(self, api_method):
+        return api_method in self._handlers
+
+    def get_handler(self, api_method):
+        return self._handlers[api_method]

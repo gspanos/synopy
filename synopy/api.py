@@ -2,19 +2,19 @@
 from .base import ApiBase
 
 
-class ApiInfo(ApiBase):
+class Info(ApiBase):
     path = 'query.cgi'
     namespace = 'SYNO.API.Info'
     methods = 'query'
 
 
-class ApiAuth(ApiBase):
+class Auth(ApiBase):
     path = 'auth.cgi'
     namespace = 'SYNO.API.Auth'
     methods = ('login', 'logout')
 
 
-class ApiDownloadStationInfo(ApiBase):
+class DownloadStationInfo(ApiBase):
     path = 'DownloadStation/info.cgi'
     namespace = 'SYNO.DownloadStation.Info'
     methods = [
@@ -24,13 +24,13 @@ class ApiDownloadStationInfo(ApiBase):
     ]
 
 
-class ApiDownloadStationSchedule(ApiBase):
+class DownloadStationSchedule(ApiBase):
     path = 'DownloadStation/schedule.cgi'
     namespace = 'SYNO.DownloadStation.Schedule'
     methods = [('getconfig', 'get_config'), ('setconfig', 'set_config')]
 
 
-class ApiDownloadStationTask(ApiBase):
+class DownloadStationTask(ApiBase):
     path = 'DownloadStation/task.cgi'
     namespace = 'SYNO.DownloadStation.Task'
     methods = [
