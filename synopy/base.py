@@ -4,7 +4,8 @@ from urlparse import urljoin
 
 import requests
 
-from errors import format_error
+from .errors import format_error
+from .util import extract_sid
 
 
 WEBAPI_PREFIX = 'webapi'
@@ -39,23 +40,25 @@ class Connection(object):
         base_path = u':'.join([base_path, self.port])
         return urljoin(base_path, path)
 
-    def build_request_options(self, http_method, params, use_auth=False):
+    def build_request_options(self, http_method, params):
         opts = {'params' if http_method == 'get' else 'data': params}
-        if use_auth:
+        if self.auth:
+            # if we have credentials, then use them.
+            auth_params = self.auth.build_params()
             if self.auth.format == 'sid':
                 # pass the sid along with the get params
-                opts['params'].update(self.auth.build_params())
+                opts['params'].update(auth_params)
             else:
                 # pass it as a cookie
-                opts['cookies'] = self.auth.build_params()
+                opts['cookies'] = auth_params
         return opts
 
-    def send(self, path, http_method, namespace, params, use_auth=False):
+    def send(self, path, http_method, namespace, params):
         http_method = http_method.lower()
         assert http_method in ('get', 'post'), "invalid http method"
 
         url = self.build_url(path)
-        opts = self.build_request_options(http_method, params, use_auth=use_auth)
+        opts = self.build_request_options(http_method, params)
         if http_method == 'get':
             resp = requests.get(url, **opts)
         else:
@@ -70,11 +73,24 @@ class Connection(object):
                 response.error_message = format_error(errno, namespace)
         return response
 
+    def authenticate(self, account, passwd):
+        path = u'/'.join([WEBAPI_PREFIX, 'auth.cgi'])
+        params = {'method': 'login', 'account': account, 'passwd': passwd,
+                  'version': 2, 'api': 'SYNO.API.Auth'}
+        resp = self.send(path, 'GET', 'SYNO.API.Auth', params)
+        if resp.is_success():
+            sid = extract_sid(resp)
+            self.auth = Authentication(sid)
+        else:
+            raise ValueError(u"Wrong account name or password")
+
 
 class Response(object):
     def __init__(self, resp):
         # the ``requests`` library response object
         self.raw_response = resp
+        # response headers
+        self.headers = resp.headers
         # the http status code
         self.status_code = resp.status_code
         # the url that initiated this response
@@ -92,12 +108,11 @@ class Response(object):
         return self.payload.get('error') and self.payload['error']['code'] or None
 
 
-def _send_command(self, api_method, http_method, params, use_auth=False):
+def _send_command(self, api_method, http_method, params):
     all_params = self.base_params
     all_params['method'] = api_method
     all_params.update(params)
-    return self.conn.send(self.path, http_method, self.namespace, all_params,
-                          use_auth=use_auth)
+    return self.conn.send(self.path, http_method, self.namespace, all_params)
 
 
 class ApiBaseMeta(type):
@@ -107,22 +122,50 @@ class ApiBaseMeta(type):
         if not parents:
             return
         api_methods = attrs.pop('methods')
+        if isinstance(api_methods, basestring):
+            api_methods = [api_methods]
+            
+        for api_method in api_methods:
+            cls.add_api_method(api_method)
 
-        def wrapped_send(api_method, http_method, use_auth=False):
+    def add_api_method(cls, api_method):
+        def wrapped_send(api_method_name, http_method):
             def _wrapped(self, **params):
-                return _send_command(self, api_method, http_method, params,
-                                     use_auth=use_auth)
+                return _send_command(self, api_method_name, http_method, params)
             return _wrapped
 
-        for api_method, api_values in api_methods.iteritems():
-            func_name = api_values.pop('func_name', api_method)
-            http_method = api_values.pop('http_method', 'GET')
-            use_auth = api_values.pop('use_auth')
-            setattr(
-                cls,
-                func_name,
-                wrapped_send(api_method, http_method, use_auth=use_auth)
-            )
+        if isinstance(api_method, basestring):
+            api_method_name, func_name, http_method = api_method, api_method, 'GET'
+        elif isinstance(api_method, (list, tuple)):
+            if len(api_method) == 3:
+                api_method_name, func_name, http_method = api_method
+                assert isinstance(api_method_name, basestring), "Invalid API method name"
+
+                func_name = func_name or api_method
+                http_method = http_method or 'GET'
+            elif len(api_method) == 2:
+                api_method_name, func_name = api_method
+                assert isinstance(api_method_name, basestring), "Invalid API method name"
+
+                func_name = func_name or api_method
+                http_method = 'GET'
+            elif len(api_method) == 1:
+                api_method_name = api_method
+                assert isinstance(api_method_name, basestring), "Invalid API method name"
+
+                func_name = api_method_name
+                http_method = 'GET'
+            else:
+                raise ValueError("Invalid API method definition: {} parameters!"
+                                 .format(len(api_method)))
+        else:
+            raise TypeError("Invalid API method type: {!r}".format(type(api_method)))
+
+        setattr(
+            cls,
+            func_name,
+            wrapped_send(api_method, http_method)
+        )
 
 
 class ApiBase(object):
@@ -132,7 +175,7 @@ class ApiBase(object):
     methods = None
 
     def __init__(self, connection, version, namespace_prefix=WEBAPI_PREFIX):
-        assert int(version), "port number must be integer"
+        assert int(version), "version number must be integer"
 
         self.conn = connection
         self.version = str(version)
