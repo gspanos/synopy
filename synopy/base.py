@@ -7,6 +7,9 @@ import requests
 from errors import format_error
 
 
+WEBAPI_PREFIX = 'webapi'
+
+
 class Authentication(object):
     def __init__(self, sid, format='cookie'):
         assert format in ('cookie', 'sid'), "invalid sid format"
@@ -21,7 +24,7 @@ class Authentication(object):
         return auth
 
 
-class RequestManager(object):
+class Connection(object):
     def __init__(self, protocol, domain, auth=None, port=80):
         assert protocol in ('http', 'https'), "invalid protocol"
         assert int(port), "port number must be integer"
@@ -47,7 +50,7 @@ class RequestManager(object):
                 opts['cookies'] = self.auth.build_params()
         return opts
 
-    def run(self, path, http_method, namespace, params, use_auth=False):
+    def send(self, path, http_method, namespace, params, use_auth=False):
         http_method = http_method.lower()
         assert http_method in ('get', 'post'), "invalid http method"
 
@@ -87,3 +90,58 @@ class Response(object):
     @property
     def error_code(self):
         return self.payload.get('error') and self.payload['error']['code'] or None
+
+
+def _send_command(self, api_method, http_method, params, use_auth=False):
+    all_params = self.base_params
+    all_params['method'] = api_method
+    all_params.update(params)
+    return self.conn.send(self.path, http_method, self.namespace, all_params,
+                          use_auth=use_auth)
+
+
+class ApiBaseMeta(type):
+    def __init__(cls, name, bases, attrs):
+        super(ApiBaseMeta, cls).__init__(name, bases, attrs)
+        parents = [b for b in bases if isinstance(b, ApiBaseMeta)]
+        if not parents:
+            return
+        api_methods = attrs.pop('methods')
+
+        def wrapped_send(api_method, http_method, use_auth=False):
+            def _wrapped(self, **params):
+                return _send_command(self, api_method, http_method, params,
+                                     use_auth=use_auth)
+            return _wrapped
+
+        for api_method, api_values in api_methods.iteritems():
+            func_name = api_values.pop('func_name', api_method)
+            http_method = api_values.pop('http_method', 'GET')
+            use_auth = api_values.pop('use_auth')
+            setattr(
+                cls,
+                func_name,
+                wrapped_send(api_method, http_method, use_auth=use_auth)
+            )
+
+
+class ApiBase(object):
+    __metaclass__ = ApiBaseMeta
+    path = None
+    namespace = None
+    methods = None
+
+    def __init__(self, connection, version, namespace_prefix=WEBAPI_PREFIX):
+        assert int(version), "port number must be integer"
+
+        self.conn = connection
+        self.version = str(version)
+        self.prefix = namespace_prefix or u''
+        self.path = u'/'.join([self.prefix, self.path])
+
+    @property
+    def base_params(self):
+        return {
+            'api': self.namespace,
+            'version': self.version
+        }
