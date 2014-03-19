@@ -65,9 +65,10 @@ class Connection(object):
         else:
             resp = requests.post(url, **opts)
 
-        if caller and caller.has_handler(api_method):
-            return caller.get_handler(api_method)(resp)
-        return self.handle_response(resp, namespace)
+        response = self.handle_response(resp, namespace)
+        if caller and caller.has_handler_for(api_method):
+            return caller.get_handler_for(api_method)(response)
+        return response
 
     def handle_response(self, resp, namespace):
         response = Response(resp)
@@ -139,9 +140,10 @@ class ApiBaseMeta(type):
             cls.add_api_method(api_method)
 
     def add_api_method(cls, api_method):
-        def wrapped_send(api_method_name, http_method):
+
+        def wrapped_send(_api_method_name, _http_method):
             def _wrapped(self, **params):
-                return _send_command(self, api_method_name, http_method, params)
+                return _send_command(self, _api_method_name, _http_method, params)
             return _wrapped
 
         if isinstance(api_method, basestring):
@@ -160,7 +162,7 @@ class ApiBaseMeta(type):
                 func_name = func_name or api_method
                 http_method = 'GET'
             elif len(api_method) == 1:
-                api_method_name = api_method
+                api_method_name = api_method[0]
                 assert isinstance(api_method_name, basestring), "Invalid API method name"
 
                 func_name = api_method_name
@@ -174,7 +176,7 @@ class ApiBaseMeta(type):
         setattr(
             cls,
             func_name,
-            wrapped_send(api_method, http_method)
+            wrapped_send(api_method_name, http_method)
         )
 
 
@@ -200,11 +202,14 @@ class ApiBase(object):
             'version': self.version
         }
 
-    def add_handler(self, api_method, handler):
+    def set_handler_for(self, api_method, handler):
         self._handlers[api_method] = handler
 
-    def has_handler(self, api_method):
+    def has_handler_for(self, api_method):
         return api_method in self._handlers
 
-    def get_handler(self, api_method):
+    def get_handler_for(self, api_method):
         return self._handlers[api_method]
+
+    def remove_handler_for(self, api_method):
+        del self._handlers[api_method]
