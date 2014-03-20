@@ -34,10 +34,7 @@ class DownloadStationTask(ApiBase):
     path = 'DownloadStation/task.cgi'
     namespace = 'SYNO.DownloadStation.Task'
     methods = [
-        'list',
-        'pause',
-        'resume',
-        'delete',
+        'list', 'pause', 'resume', 'delete',
         ('getinfo', 'get_info'),
         ('create', 'create', 'POST')
     ]

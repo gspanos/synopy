@@ -5,7 +5,6 @@ from urlparse import urljoin
 import requests
 
 from .errors import format_error
-from .util import extract_sid
 
 
 WEBAPI_PREFIX = 'webapi'
@@ -84,7 +83,7 @@ class Connection(object):
                   'version': 2, 'api': 'SYNO.API.Auth'}
         resp = self.send(path, 'GET', 'SYNO.API.Auth', params)
         if resp.is_success():
-            sid = extract_sid(resp)
+            sid = resp.cookies['id']
             self.auth = Authentication(sid)
         else:
             raise ValueError(u"Wrong account name or password")
@@ -96,6 +95,8 @@ class Response(object):
         self.raw_response = resp
         # response headers
         self.headers = resp.headers
+        # response coolies
+        self.cookies = resp.cookies
         # the http status code
         self.status_code = resp.status_code
         # the url that initiated this response

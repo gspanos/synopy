@@ -6,10 +6,14 @@ Python library for the Synology DiskStation APIs
 Description
 ===========
 
-This project aims to support all the APIs for the Synology NAS DiskStations.
+This project aims to support as many web APIs for the Synology NAS DiskStations,
+as possible.
 
-Right now the only official API specification published by Synology, is for
-the Download Station. And you can find it [here][1].
+Right now the only official API specifications published by Synology(that I
+know of) are:
+
+1. the Download Station API [here][1]
+2. the File Station API [here][2]
 
 This is alpha software and there might be dramatic changes between releases, until
 it reaches a stable state.
@@ -132,3 +136,4 @@ print(resp.payload)
 More to come!
 
 [1]: http://ukdl.synology.com/download/other/Synology_Download_Station_Official_API_V3.pdf
+[2]: http://ukdl.synology.com/ftp/ds/userguide/Synology_File_Station_API.pdf
