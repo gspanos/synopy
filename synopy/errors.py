@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import itertools as it
+from six import iteritems
 from collections import defaultdict
 
 COMMON_ERROR_CODES = (
@@ -44,9 +45,10 @@ def _build_error_map():
     all_errors = defaultdict(dict)
     for namespace, errors in it.chain([COMMON_ERROR_CODES, AUTH_API_ERROR_CODES,
                                        DS_API_ERROR_CODES]):
-        for errno, msg in errors.iteritems():
+        for errno, msg in iteritems(errors):
             all_errors[errno][namespace] = msg
     return all_errors
+
 
 ALL_ERROR_CODES = _build_error_map()
 
