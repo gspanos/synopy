@@ -81,8 +81,15 @@ class Connection(object):
 
     def authenticate(self, account, passwd):
         path = u'/'.join([WEBAPI_PREFIX, 'auth.cgi'])
-        params = {'method': 'login', 'account': account, 'passwd': passwd,
-                  'version': 2, 'api': 'SYNO.API.Auth'}
+        params = {
+            'method': 'login',
+            'account': account,
+            'passwd': passwd,
+            'version': 2,
+            'api': 'SYNO.API.Auth',
+            'format': 'sid',
+            'session': 'DownloadStation'
+        }
         resp = self.send(path, 'GET', 'SYNO.API.Auth', params)
         if resp.is_success():
             sid = resp.cookies['id']
