@@ -25,7 +25,7 @@ class Authentication(object):
 
 
 class Connection(object):
-    def __init__(self, protocol, domain, auth=None, port=80):
+    def __init__(self, protocol, domain, auth=None, port=80, verify=True):
         assert protocol in ('http', 'https'), "invalid protocol"
         assert int(port), "port number must be integer"
 
@@ -33,6 +33,7 @@ class Connection(object):
         self.domain = domain
         self.auth = auth
         self.port = str(port)
+        self.verify = verify
 
     def build_url(self, path):
         base_path = u'://'.join([self.protocol, self.domain])
@@ -50,6 +51,7 @@ class Connection(object):
             else:
                 # pass it as a cookie
                 opts['cookies'] = auth_params
+        opts['verify'] = self.verify
         return opts
 
     def send(self, path, http_method, namespace, params, caller=None):
