@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 import json
-from urlparse import urljoin
-
+try:
+    from urlparse import urljoin
+except ModuleNotFoundError:
+    from urllib.parse import urljoin
+import six
 import requests
 
 from .errors import format_error
@@ -25,7 +28,7 @@ class Authentication(object):
 
 
 class Connection(object):
-    def __init__(self, protocol, domain, auth=None, port=80):
+    def __init__(self, protocol, domain, auth=None, port=80, verify=True):
         assert protocol in ('http', 'https'), "invalid protocol"
         assert int(port), "port number must be integer"
 
@@ -33,6 +36,7 @@ class Connection(object):
         self.domain = domain
         self.auth = auth
         self.port = str(port)
+        self.verify = verify
 
     def build_url(self, path):
         base_path = u'://'.join([self.protocol, self.domain])
@@ -50,6 +54,7 @@ class Connection(object):
             else:
                 # pass it as a cookie
                 opts['cookies'] = auth_params
+        opts['verify'] = self.verify
         return opts
 
     def send(self, path, http_method, namespace, params, caller=None):
@@ -79,8 +84,15 @@ class Connection(object):
 
     def authenticate(self, account, passwd):
         path = u'/'.join([WEBAPI_PREFIX, 'auth.cgi'])
-        params = {'method': 'login', 'account': account, 'passwd': passwd,
-                  'version': 2, 'api': 'SYNO.API.Auth'}
+        params = {
+            'method': 'login',
+            'account': account,
+            'passwd': passwd,
+            'version': 2,
+            'api': 'SYNO.API.Auth',
+            'format': 'sid',
+            'session': 'DownloadStation'
+        }
         resp = self.send(path, 'GET', 'SYNO.API.Auth', params)
         if resp.is_success():
             sid = resp.cookies['id']
@@ -102,7 +114,8 @@ class Response(object):
         # the url that initiated this response
         self.url = resp.url
         # the deserialized json data
-        self.payload = resp.status_code == 200 and json.loads(resp.content) or {}
+        self.payload = resp.status_code == 200 and json.loads(
+            resp.content) or {}
         # user friendly message
         self.error_message = None
 
@@ -112,6 +125,9 @@ class Response(object):
     @property
     def error_code(self):
         return self.payload.get('error') and self.payload['error']['code'] or None
+
+    def __str__(self):
+        return str(self.payload)
 
 
 def _send_command(self, api_method, http_method, params):
@@ -134,7 +150,7 @@ class ApiBaseMeta(type):
         if not parents:
             return
         api_methods = attrs.pop('methods')
-        if isinstance(api_methods, basestring):
+        if isinstance(api_methods, six.string_types):
             api_methods = [api_methods]
 
         for api_method in api_methods:
@@ -147,24 +163,27 @@ class ApiBaseMeta(type):
                 return _send_command(self, _api_method_name, _http_method, params)
             return _wrapped
 
-        if isinstance(api_method, basestring):
+        if isinstance(api_method, six.string_types):
             api_method_name, func_name, http_method = api_method, api_method, 'GET'
         elif isinstance(api_method, (list, tuple)):
             if len(api_method) == 3:
                 api_method_name, func_name, http_method = api_method
-                assert isinstance(api_method_name, basestring), "Invalid API method name"
+                assert isinstance(
+                    api_method_name, six.string_types), "Invalid API method name"
 
                 func_name = func_name or api_method
                 http_method = http_method or 'GET'
             elif len(api_method) == 2:
                 api_method_name, func_name = api_method
-                assert isinstance(api_method_name, basestring), "Invalid API method name"
+                assert isinstance(
+                    api_method_name, six.string_types), "Invalid API method name"
 
                 func_name = func_name or api_method
                 http_method = 'GET'
             elif len(api_method) == 1:
                 api_method_name = api_method[0]
-                assert isinstance(api_method_name, basestring), "Invalid API method name"
+                assert isinstance(
+                    api_method_name, six.string_types), "Invalid API method name"
 
                 func_name = api_method_name
                 http_method = 'GET'
@@ -172,7 +191,8 @@ class ApiBaseMeta(type):
                 raise ValueError("Invalid API method definition: {} parameters!"
                                  .format(len(api_method)))
         else:
-            raise TypeError("Invalid API method type: {!r}".format(type(api_method)))
+            raise TypeError(
+                "Invalid API method type: {!r}".format(type(api_method)))
 
         setattr(
             cls,
@@ -181,8 +201,8 @@ class ApiBaseMeta(type):
         )
 
 
+@six.add_metaclass(ApiBaseMeta)
 class ApiBase(object):
-    __metaclass__ = ApiBaseMeta
     path = None
     namespace = None
     methods = None
